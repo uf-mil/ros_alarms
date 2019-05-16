@@ -37,7 +37,7 @@ class AlarmServer(object):
         Updating the alarm triggers all of the alarms callbacks
         '''
         if alarm.alarm_name in self.handlers:
-            res = self.handlers[alarm.alarm_name].on_set(alarm)
+            res = self.handlers[alarm.alarm_name].on_set(Alarm.from_msg(alarm))
             if res is False:
                 return False
 
@@ -123,23 +123,17 @@ class AlarmServer(object):
             h = handler()
 
             alarm_name = handler.alarm_name
-
-            # Set initial state if necessary (could have already been added while creating metas)
-            if hasattr(h, 'initial_alarm'):
-                if alarm_name in self.alarms:
-                    self.alarms[alarm_name].update(h.initial_alarm)
-                else:
-                    self.alarms[alarm_name] = h.initial_alarm  # Update even if already added to server
-            elif alarm_name not in self.alarms:  # Add default initial if not there already
-                self.alarms[alarm_name] = self.make_tagged_alarm(alarm_name)
-            else:
-                pass
+            self.handlers[alarm_name] = h
 
             # If a handler exists for a meta alarm, we need to save the predicate
             if alarm_name in self.meta_alarms:
                 self.meta_alarms[alarm_name] = h.meta_predicate
 
-            self.handlers[alarm_name] = h
+            # Set initial state if necessary (could have already been added while creating metas)
+            if hasattr(h, 'initial_alarm'):
+                self.set_alarm(h.initial_alarm.as_msg())
+            else:
+		self.set_alarm(self.make_tagged_alarm(alarm_name).as_msg())
 
             rospy.loginfo("Loaded handler: {}".format(h.alarm_name))
 
